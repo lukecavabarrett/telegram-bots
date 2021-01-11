@@ -1,0 +1,5 @@
+state - | Print the exchange state
+open - [timeout] | Open the exchange
+close - | Close the exchange
+buy - [@price] [:qty] | Place a buy order.
+sell - [@price] [:qty] | Place a sell order.
