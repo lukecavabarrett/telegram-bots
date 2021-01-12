@@ -34,7 +34,7 @@ class BotHandler:
         return last_update
 
 
-with open("/home/luke/PycharmProjects/trading-estimathon/token.txt", "r") as myfile:
+with open("token.txt", "r") as myfile:
     token = myfile.readlines()[0]
 
 magnito_bot = BotHandler(token)  # Your bot's name
@@ -48,7 +48,8 @@ while True:
     all_updates = magnito_bot.get_updates(new_offset)
     if len(all_updates) > 0:
         for current_update in all_updates:
-            print(json.dumps(current_update, indent=2))
+            #print(json.dumps(current_update, indent=2))
+            print('received... ',end='')
             first_update_id = current_update['update_id']
             new_offset = first_update_id + 1
             if 'message' not in current_update:
@@ -64,4 +65,5 @@ while True:
             if msg['chat']['id'] not in exchanges:
                 exchanges[msg['chat']['id']] = Exchange(lambda x: magnito_bot.send_message(msg['chat']['id'], x))
 
-            exchanges[msg['chat']['id']].handle(msg)
+            exchanges[msg['chat']['id']].handle_multiline(msg)
+            print('processed.')
