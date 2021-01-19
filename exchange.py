@@ -26,6 +26,20 @@ class Order:
         return str(self)
 
 
+def profit_string(balance, equity):
+    if equity == 0:
+        if balance < 0:
+            return "<b>loss</b>"
+        elif balance == 0:
+            return "  "
+        else:  # balance>0
+            return "<b> gain </b>"
+    elif equity < 0:
+        return 'P &#8804; ' + "{:.2f}".format(-balance / equity)
+    else:  # equity>0
+        return 'P &#8805; ' + "{:.2f}".format(-balance / equity)
+
+
 class OrderBook:  # Book for a single stock
 
     def __init__(self, output):
@@ -36,7 +50,8 @@ class OrderBook:  # Book for a single stock
         self.balance = dict()  # ids to balance
         self.equity = dict()  # ids to equity
 
-    def to_string(self, id_to_users, balance=False, equity=False):
+    def to_string(self, id_to_users, balance=False, equity=False, profit=False):
+        profit = True
         msg = '<b>BIDS:</b>\n' + '\n'.join(map(str, reversed(self.bids))) + '\n<b>ASKS:</b>\n' + '\n'.join(
             map(str, reversed(self.asks))) + '\n'
         if balance:
@@ -45,6 +60,10 @@ class OrderBook:  # Book for a single stock
         if equity:
             msg += '<b>Stocks:</b>\n' + '\n'.join(
                 map(lambda x: str(id_to_users[x[0]]) + ': ' + str(x[1]) + 'P', self.equity.items())) + '\n';
+        if profit:
+            msg += '<b>Profit:</b>\n' + '\n'.join(
+                map(lambda id: str(id_to_users[id]) + ': ' + profit_string(self.balance[id], self.equity[id]),
+                    self.equity.keys())) + '\n'
 
         return msg
 
@@ -106,12 +125,39 @@ class OrderBook:  # Book for a single stock
                 self.asks.insert(idx, order)
                 self.output(str(order) + ' placed in the orderbook')
 
+
+
     def settle(self, price):
         for who, qty in self.equity.items():
             self.balance[who] += qty * price
         self.equity = dict()
         self.bids = []
         self.asks = []
+
+    def remove_order(self, remove_id: int, sender):
+        for i, order in enumerate(self.asks):
+            if order.id == remove_id:
+                if order.owner.id != sender.id:
+                    self.output(str(sender) + ': you cannot remove order #' + str(
+                        remove_id) + ' as the you\'re not the owner (' + str(order.owner) + ') is.')
+                    return False
+                self.output(str(sender) + ' removed order #' + str(remove_id))
+                del self.asks[i]
+                return True
+
+        for i, order in enumerate(self.bids):
+            if order.id == remove_id:
+                if order.owner.id != sender.id:
+                    self.output(str(sender) + ': you cannot remove order #' + str(
+                        remove_id) + ' as the you\'re not the owner (' + str(order.owner) + ') is.')
+                    return False
+                self.output(str(sender) + ' removed order #' + str(remove_id))
+                del self.bids[i]
+                return True
+
+        self.output(str(sender) + ': you cannot remove order #' + str(
+            remove_id) + ' as it is not present in the book at the current time.')
+        return False
 
 
 class User:
@@ -153,12 +199,12 @@ class Exchange:
     def reset(self):
         self.orderbook = OrderBook(self.output)
 
-    def print_state(self, orderbook=False, balances=False):
+    def print_state(self, orderbook=False, balances=False, profit=False):
         msg = 'The exchange is currently <b>' + ('open' if self.open else 'close') + '</b>.'
         if self.open and self.close_at:
             msg += ' It will close at <b>' + str(self.close_at) + '</b>.'
         if self.open and orderbook:
-            msg += '\n' + self.orderbook.to_string(self.id_to_user, balance=balances, equity=balances)
+            msg += '\n' + self.orderbook.to_string(self.id_to_user, balance=balances, equity=balances, profit=profit)
         self.output(msg)
 
     def handle_multiline(self, msg):
@@ -176,7 +222,7 @@ class Exchange:
             if (argc[0].endswith('@TradingEstimathonBot')):
                 argc[0] = argc[0][:-21]
             if argc[0] == '/state':
-                self.print_state(orderbook=True, balances=True)
+                self.print_state(orderbook=True, balances=True, profit=True)
             elif argc[0] == '/reset':
                 self.reset()
                 self.print_state(orderbook=True, balances=True)
@@ -204,6 +250,15 @@ class Exchange:
                         raise IOError(argc[1] + ' is not a valid time interval')
                     self.close_at = datetime.fromtimestamp(int(msg['date']) + timedelta)
                 self.print_state(orderbook=True, balances=True)
+            elif argc[0] == '/remove':
+                if not self.open:
+                    self.print_state()
+                    return
+                if len(argc) != 2:
+                    raise IOError(argc[0] + ' requires a single argument #id')
+                id = int(argc[1])
+                if self.orderbook.remove_order(id, sender):
+                    self.print_state(orderbook=True, balances=True)
             elif argc[0] == '/buy':
                 if not self.open:
                     self.print_state()
