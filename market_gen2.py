@@ -35,8 +35,8 @@ class TimeValue:
         self.value = value
 
     def __str__(self):
-        delta = '{:8.04f}'.format(abs(float(self.delta)))
-        return '{:8.04f}'.format(float(self.value)) + (
+        delta = '{:>12.04f}'.format(abs(float(self.delta)))
+        return '{:10.04f}'.format(float(self.value)) + (
             '\033[0;31m ▼' if self.delta < 0 else ('\033[0;32m ▲' if self.delta > 0 else ' ■')) + delta + '\033[0m'
 
     def __repr__(self):
